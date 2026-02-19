@@ -86,7 +86,7 @@ let client = PostgresClient(
     backgroundLogger: logger
 )
 
-let database = PostgresDatabaseClient(
+let database = DatabaseClientPostgres(
     client: client,
     logger: logger
 )
