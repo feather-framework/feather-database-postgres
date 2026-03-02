@@ -10,29 +10,37 @@ import PostgresNIO
 
 public struct DatabaseTransactionErrorPostgres: DatabaseTransactionError {
 
-    var underlyingError: PostgresTransactionError
+    public let file: String
+    public let line: Int
+    public let beginError: (any Error)?
+    public let closureError: (any Error)?
+    public let commitError: (any Error)?
+    public let rollbackError: (any Error)?
 
-    public var file: String {
-        underlyingError.file
+    init(
+        file: String = #fileID,
+        line: Int = #line,
+        beginError: (any Error)? = nil,
+        closureError: (any Error)? = nil,
+        commitError: (any Error)? = nil,
+        rollbackError: (any Error)? = nil
+    ) {
+        self.file = file
+        self.line = line
+        self.beginError = beginError
+        self.closureError = closureError
+        self.commitError = commitError
+        self.rollbackError = rollbackError
     }
 
-    public var line: Int {
-        underlyingError.line
-    }
-
-    public var beginError: (any Error)? {
-        underlyingError.beginError
-    }
-
-    public var closureError: (any Error)? {
-        underlyingError.closureError
-    }
-
-    public var commitError: (any Error)? {
-        underlyingError.commitError
-    }
-
-    public var rollbackError: (any Error)? {
-        underlyingError.rollbackError
+    init(
+        underlyingError: PostgresTransactionError
+    ) {
+        self.file = underlyingError.file
+        self.line = underlyingError.line
+        self.beginError = underlyingError.beginError
+        self.closureError = underlyingError.closureError
+        self.commitError = underlyingError.commitError
+        self.rollbackError = underlyingError.rollbackError
     }
 }
