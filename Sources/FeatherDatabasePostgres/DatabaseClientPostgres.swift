@@ -101,7 +101,10 @@ public struct DatabaseClientPostgres: DatabaseClient {
                 do {
                     let result = try await closure(databaseConnection)
                     do {
-                        _ = try await connection.query(commitQuery, logger: logger)
+                        _ = try await connection.query(
+                            commitQuery,
+                            logger: logger
+                        )
                         return result
                     }
                     catch {
