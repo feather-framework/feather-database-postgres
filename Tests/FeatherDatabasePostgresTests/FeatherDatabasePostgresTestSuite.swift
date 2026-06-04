@@ -7,6 +7,7 @@
 
 import FeatherDatabase
 import Logging
+import NIOPosix
 import NIOSSL
 import PostgresNIO
 import Testing
@@ -57,38 +58,121 @@ struct FeatherDatabasePostgresTestSuite {
 
         let host = environment["POSTGRES_HOST"] ?? "127.0.0.1"
         let port = environment["POSTGRES_PORT"].flatMap(Int.init) ?? 5432
+        let testDatabaseName = "test_\(randomTableSuffix())"
 
         var tlsConfig = TLSConfiguration.makeClientConfiguration()
         let rootCert = try NIOSSLCertificate.fromPEMFile(finalCertPath)
         tlsConfig.trustRoots = .certificates(rootCert)
         tlsConfig.certificateVerification = .fullVerification
+        let clientTLSConfig = tlsConfig
+        let sslContext = try NIOSSLContext(configuration: tlsConfig)
 
-        let client = PostgresClient(
-            configuration: .init(
-                host: host,
-                port: port,
-                username: "postgres",
-                password: "postgres",
-                database: "postgres",
-                tls: .require(tlsConfig)
-            ),
-            backgroundLogger: logger
+        let createDatabaseQuery = PostgresQuery(
+            unsafeSQL: #"""
+                CREATE DATABASE "\#(testDatabaseName)"
+                """#,
+            binds: .init()
         )
 
-        let database = DatabaseClientPostgres(
-            client: client,
-            logger: logger
+        let dropDatabaseQuery = PostgresQuery(
+            unsafeSQL: #"""
+                DROP DATABASE IF EXISTS "\#(testDatabaseName)" WITH (FORCE)
+                """#,
+            binds: .init()
         )
 
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask {
-                await client.run()
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+        do {
+            let rootConnection =
+                try await PostgresConnection.connect(
+                    on: eventLoopGroup.next(),
+                    configuration: .init(
+                        host: host,
+                        port: port,
+                        username: "postgres",
+                        password: "postgres",
+                        database: "postgres",
+                        tls: .require(sslContext)
+                    ),
+                    id: 1,
+                    logger: logger
+                )
+
+            func cleanup() async {
+                do {
+                    _ = try await rootConnection
+                        .query(dropDatabaseQuery, logger: logger)
+                        .get()
+                }
+                catch {
+                    // The temporary database may already be gone.
+                }
+
+                do {
+                    try await rootConnection.close().get()
+                }
+                catch {
+                    // Ignore close failures during teardown.
+                }
+
+                do {
+                    try await eventLoopGroup.shutdownGracefully()
+                }
+                catch {
+                    // Ignore shutdown failures during teardown.
+                }
             }
-            group.addTask {
-                try await closure(database)
+
+            do {
+                _ = try await rootConnection
+                    .query(createDatabaseQuery, logger: logger)
+                    .get()
             }
-            try await group.next()
-            group.cancelAll()
+            catch {
+                await cleanup()
+                Issue.record(error)
+                return
+            }
+
+            let client = PostgresClient(
+                configuration: .init(
+                    host: host,
+                    port: port,
+                    username: "postgres",
+                    password: "postgres",
+                    database: testDatabaseName,
+                    tls: .require(clientTLSConfig)
+                ),
+                backgroundLogger: logger
+            )
+            let database = DatabaseClientPostgres(
+                client: client,
+                logger: logger
+            )
+
+            do {
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    group.addTask {
+                        await client.run()
+                    }
+                    group.addTask {
+                        try await closure(database)
+                    }
+                    _ = try await group.next()
+                    group.cancelAll()
+                    _ = try await group.next()
+                }
+            }
+            catch {
+                Issue.record(error)
+            }
+
+            await cleanup()
+        }
+        catch {
+            try? await eventLoopGroup.shutdownGracefully()
+            Issue.record(error)
         }
     }
 
