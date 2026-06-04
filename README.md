@@ -3,9 +3,9 @@
 Postgres driver implementation for the abstract [Feather Database](https://github.com/feather-framework/feather-database) Swift API package.
 
 [
-    ![Release: 1.0.0-beta.6](https://img.shields.io/badge/Release-1%2E0%2E0--beta%2E6-F05138)
+    ![Release: 1.0.0-rc.1](https://img.shields.io/badge/Release-1%2E0%2E0--rc%2E1-F05138)
 ](
-    https://github.com/feather-framework/feather-database-postgres/releases/tag/1.0.0-beta.6
+    https://github.com/feather-framework/feather-database-postgres/releases/tag/1.0.0-rc.1
 )
 
 ## Features
@@ -37,7 +37,7 @@ Postgres driver implementation for the abstract [Feather Database](https://githu
 Add the dependency to your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/feather-framework/feather-database-postgres", exact: "1.0.0-beta.6"),
+.package(url: "https://github.com/feather-framework/feather-database-postgres", exact: "1.0.0-rc.1"),
 ```
 
 Then add `FeatherDatabasePostgres` to your target dependencies:
@@ -118,9 +118,6 @@ try await withThrowingTaskGroup(of: Void.self) { group in
     group.cancelAll()
 }
 ```
-
-> [!WARNING]  
-> This repository is a work in progress, things can break until it reaches v1.0.0.
 
 ## Other database drivers
 
