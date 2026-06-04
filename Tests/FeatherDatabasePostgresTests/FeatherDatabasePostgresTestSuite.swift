@@ -101,7 +101,8 @@ struct FeatherDatabasePostgresTestSuite {
 
             func cleanup() async {
                 do {
-                    _ = try await rootConnection
+                    _ =
+                        try await rootConnection
                         .query(dropDatabaseQuery, logger: logger)
                         .get()
                 }
@@ -125,7 +126,8 @@ struct FeatherDatabasePostgresTestSuite {
             }
 
             do {
-                _ = try await rootConnection
+                _ =
+                    try await rootConnection
                     .query(createDatabaseQuery, logger: logger)
                     .get()
             }
