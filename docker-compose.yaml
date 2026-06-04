@@ -29,6 +29,22 @@ services:
             timeout: 5s
             retries: 10
 
+    test:
+        build:
+            context: .
+            dockerfile: docker/tests/Dockerfile
+        depends_on:
+            postgres:
+                condition: service_healthy
+        environment:
+            POSTGRES_HOST: postgres
+            POSTGRES_PORT: 5432
+            POSTGRES_CA_CERT_PATH: /app/docker/postgres/certificates/ca.pem
+        volumes:
+            - .:/app
+        working_dir: /app
+        command: ["swift", "test", "--parallel", "--enable-code-coverage"]
+
 volumes:
     postgres:
     

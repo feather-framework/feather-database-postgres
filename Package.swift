@@ -37,7 +37,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-log", from: "1.6.0"),
         .package(url: "https://github.com/vapor/postgres-nio", from: "1.27.0"),
-        .package(url: "https://github.com/feather-framework/feather-database", exact: "1.0.0-beta.5"),
+//        .package(url: "https://github.com/feather-framework/feather-database", exact: "1.0.0-beta.5"),
+        .package(url: "https://github.com/feather-framework/feather-database", branch: "main"),
         // [docc-plugin-placeholder]
     ],
     targets: [

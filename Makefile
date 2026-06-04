@@ -47,4 +47,4 @@ test:
 	swift test --parallel
 
 docker-test:
-	docker build -t feather-database-postgres-tests . -f ./docker/tests/Dockerfile && docker run --rm feather-database-postgres-tests
+	make test-certs && docker compose up --build --abort-on-container-exit --exit-code-from test test
