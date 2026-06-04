@@ -40,22 +40,5 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Generate certificates
-        run: make test-certs
-      - name: Start Postgres Docker Container
-        run: docker compose up -d --build
-      - name: Wait For Postgres Docker Container
-        run: |
-          for i in {1..30}; do
-            if docker compose exec -T postgres pg_isready -U postgres -d postgres; then
-              exit 0
-            fi
-            sleep 1
-          done
-          docker compose logs postgres
-          exit 1
-      - name: Run Tests
-        run: swift test --parallel
-      - name: Stop Postgres Docker Container
-        if: always()
-        run: docker compose down -v
+      - name: Run Docker Tests
+        run: make docker-test
