@@ -12,6 +12,7 @@ import PostgresNIO
 ///
 /// Use this type to iterate or collect Postgres query results.
 public struct DatabaseRowSequencePostgres: DatabaseRowSequence {
+    public typealias Row = DatabaseRowPostgres
 
     var backingSequence: PostgresRowSequence
 
@@ -38,14 +39,14 @@ public struct DatabaseRowSequencePostgres: DatabaseRowSequence {
             return .init(row: postgresRow)
         }
         #else
-        public mutating func next() async throws -> PostgresRow? {
+        public mutating func next() async throws -> DatabaseRowPostgres? {
             guard !Task.isCancelled else {
                 return nil
             }
             guard let postgresRow = try await backingIterator.next() else {
                 return nil
             }
-            return postgresRow
+            return .init(row: postgresRow)
         }
         #endif
     }
