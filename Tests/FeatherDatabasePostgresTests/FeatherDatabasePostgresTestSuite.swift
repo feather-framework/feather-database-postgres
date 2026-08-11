@@ -37,144 +37,143 @@ struct FeatherDatabasePostgresTestSuite {
         _ closure:
             @escaping (@Sendable (DatabaseClientPostgres) async throws -> Void)
     ) async throws {
-        var logger = Logger(label: "test")
-        logger.logLevel = .info
+        try await withLogger(Logger(label: "test")) { logger in
 
-        let environment = ProcessInfo.processInfo.environment
+            let environment = ProcessInfo.processInfo.environment
 
-        let finalCertPath =
-            environment["POSTGRES_CA_CERT_PATH"]
-            ?? URL(
-                fileURLWithPath: #filePath
+            let finalCertPath =
+                environment["POSTGRES_CA_CERT_PATH"]
+                ?? URL(
+                    fileURLWithPath: #filePath
+                )
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("docker")
+                .appendingPathComponent("postgres")
+                .appendingPathComponent("certificates")
+                .appendingPathComponent("ca.pem")
+                .path()
+
+            let host = environment["POSTGRES_HOST"] ?? "127.0.0.1"
+            let port = environment["POSTGRES_PORT"].flatMap(Int.init) ?? 5432
+            let testDatabaseName = "test_\(randomTableSuffix())"
+
+            var tlsConfig = TLSConfiguration.makeClientConfiguration()
+            let rootCert = try NIOSSLCertificate.fromPEMFile(finalCertPath)
+            tlsConfig.trustRoots = .certificates(rootCert)
+            tlsConfig.certificateVerification = .fullVerification
+            let clientTLSConfig = tlsConfig
+            let sslContext = try NIOSSLContext(configuration: tlsConfig)
+
+            let createDatabaseQuery = PostgresQuery(
+                unsafeSQL: #"""
+                    CREATE DATABASE "\#(testDatabaseName)"
+                    """#,
+                binds: .init()
             )
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("docker")
-            .appendingPathComponent("postgres")
-            .appendingPathComponent("certificates")
-            .appendingPathComponent("ca.pem")
-            .path()
 
-        let host = environment["POSTGRES_HOST"] ?? "127.0.0.1"
-        let port = environment["POSTGRES_PORT"].flatMap(Int.init) ?? 5432
-        let testDatabaseName = "test_\(randomTableSuffix())"
+            let dropDatabaseQuery = PostgresQuery(
+                unsafeSQL: #"""
+                    DROP DATABASE IF EXISTS "\#(testDatabaseName)" WITH (FORCE)
+                    """#,
+                binds: .init()
+            )
 
-        var tlsConfig = TLSConfiguration.makeClientConfiguration()
-        let rootCert = try NIOSSLCertificate.fromPEMFile(finalCertPath)
-        tlsConfig.trustRoots = .certificates(rootCert)
-        tlsConfig.certificateVerification = .fullVerification
-        let clientTLSConfig = tlsConfig
-        let sslContext = try NIOSSLContext(configuration: tlsConfig)
+            let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
-        let createDatabaseQuery = PostgresQuery(
-            unsafeSQL: #"""
-                CREATE DATABASE "\#(testDatabaseName)"
-                """#,
-            binds: .init()
-        )
+            do {
+                let rootConnection =
+                    try await PostgresConnection.connect(
+                        on: eventLoopGroup.next(),
+                        configuration: .init(
+                            host: host,
+                            port: port,
+                            username: "postgres",
+                            password: "postgres",
+                            database: "postgres",
+                            tls: .require(sslContext)
+                        ),
+                        id: 1,
+                        logger: logger
+                    )
 
-        let dropDatabaseQuery = PostgresQuery(
-            unsafeSQL: #"""
-                DROP DATABASE IF EXISTS "\#(testDatabaseName)" WITH (FORCE)
-                """#,
-            binds: .init()
-        )
+                func cleanup() async {
+                    do {
+                        _ =
+                            try await rootConnection
+                            .query(dropDatabaseQuery, logger: logger)
+                            .get()
+                    }
+                    catch {
+                        // The temporary database may already be gone.
+                    }
 
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+                    do {
+                        try await rootConnection.close().get()
+                    }
+                    catch {
+                        // Ignore close failures during teardown.
+                    }
 
-        do {
-            let rootConnection =
-                try await PostgresConnection.connect(
-                    on: eventLoopGroup.next(),
+                    do {
+                        try await eventLoopGroup.shutdownGracefully()
+                    }
+                    catch {
+                        // Ignore shutdown failures during teardown.
+                    }
+                }
+
+                do {
+                    _ =
+                        try await rootConnection
+                        .query(createDatabaseQuery, logger: logger)
+                        .get()
+                }
+                catch {
+                    await cleanup()
+                    Issue.record(error)
+                    return
+                }
+
+                let client = PostgresClient(
                     configuration: .init(
                         host: host,
                         port: port,
                         username: "postgres",
                         password: "postgres",
-                        database: "postgres",
-                        tls: .require(sslContext)
+                        database: testDatabaseName,
+                        tls: .require(clientTLSConfig)
                     ),
-                    id: 1,
-                    logger: logger
+                    backgroundLogger: logger
+                )
+                let database = DatabaseClientPostgres(
+                    client: client
                 )
 
-            func cleanup() async {
                 do {
-                    _ =
-                        try await rootConnection
-                        .query(dropDatabaseQuery, logger: logger)
-                        .get()
+                    try await withThrowingTaskGroup(of: Void.self) { group in
+                        group.addTask {
+                            await client.run()
+                        }
+                        group.addTask {
+                            try await closure(database)
+                        }
+                        _ = try await group.next()
+                        group.cancelAll()
+                        _ = try await group.next()
+                    }
                 }
                 catch {
-                    // The temporary database may already be gone.
+                    Issue.record(error)
                 }
 
-                do {
-                    try await rootConnection.close().get()
-                }
-                catch {
-                    // Ignore close failures during teardown.
-                }
-
-                do {
-                    try await eventLoopGroup.shutdownGracefully()
-                }
-                catch {
-                    // Ignore shutdown failures during teardown.
-                }
-            }
-
-            do {
-                _ =
-                    try await rootConnection
-                    .query(createDatabaseQuery, logger: logger)
-                    .get()
-            }
-            catch {
                 await cleanup()
-                Issue.record(error)
-                return
-            }
-
-            let client = PostgresClient(
-                configuration: .init(
-                    host: host,
-                    port: port,
-                    username: "postgres",
-                    password: "postgres",
-                    database: testDatabaseName,
-                    tls: .require(clientTLSConfig)
-                ),
-                backgroundLogger: logger
-            )
-            let database = DatabaseClientPostgres(
-                client: client,
-                logger: logger
-            )
-
-            do {
-                try await withThrowingTaskGroup(of: Void.self) { group in
-                    group.addTask {
-                        await client.run()
-                    }
-                    group.addTask {
-                        try await closure(database)
-                    }
-                    _ = try await group.next()
-                    group.cancelAll()
-                    _ = try await group.next()
-                }
             }
             catch {
+                try? await eventLoopGroup.shutdownGracefully()
                 Issue.record(error)
             }
-
-            await cleanup()
-        }
-        catch {
-            try? await eventLoopGroup.shutdownGracefully()
-            Issue.record(error)
         }
     }
 

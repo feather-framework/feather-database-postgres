@@ -1,12 +1,8 @@
-# Feather Database Postgres 
+# Feather Database Postgres
 
 Postgres driver implementation for the abstract [Feather Database](https://github.com/feather-framework/feather-database) Swift API package.
 
-[
-    ![Release: 1.0.0-rc.1](https://img.shields.io/badge/Release-1%2E0%2E0--rc%2E1-F05138)
-](
-    https://github.com/feather-framework/feather-database-postgres/releases/tag/1.0.0-rc.1
-)
+[![Release: 1.0.0-rc.2](https://img.shields.io/badge/Release-1%2E0%2E0--rc%2E2-F05138)](https://github.com/feather-framework/feather-database-postgres/releases/tag/1.0.0-rc.2)
 
 ## Features
 
@@ -37,7 +33,7 @@ Postgres driver implementation for the abstract [Feather Database](https://githu
 Add the dependency to your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/feather-framework/feather-database-postgres", exact: "1.0.0-rc.1"),
+.package(url: "https://github.com/feather-framework/feather-database-postgres", exact: "1.0.0-rc.2"),
 ```
 
 Then add `FeatherDatabasePostgres` to your target dependencies:
@@ -50,11 +46,7 @@ Then add `FeatherDatabasePostgres` to your target dependencies:
 
 API documentation is available at the link below:
 
-[
-    ![DocC API documentation](https://img.shields.io/badge/DocC-API_documentation-F05138)
-](
-    https://feather-framework.github.io/feather-database-postgres/
-)
+[![DocC API documentation](https://img.shields.io/badge/DocC-API_documentation-F05138)](https://feather-framework.github.io/feather-database-postgres/)
 
 Here is a brief example:
 
@@ -64,9 +56,6 @@ import NIOSSL
 import PostgresNIO
 import FeatherDatabase
 import FeatherDatabasePostgres
-
-var logger = Logger(label: "example")
-logger.logLevel = .info
 
 let finalCertPath = URL(fileURLWithPath: "/path/to/ca.pem")
 var tlsConfig = TLSConfiguration.makeClientConfiguration()
@@ -83,12 +72,11 @@ let client = PostgresClient(
         database: "postgres",
         tls: .require(tlsConfig)
     ),
-    backgroundLogger: logger
+    backgroundLogger: Logger.current
 )
 
 let database = DatabaseClientPostgres(
-    client: client,
-    logger: logger
+    client: client
 )
 
 try await withThrowingTaskGroup(of: Void.self) { group in
@@ -118,6 +106,8 @@ try await withThrowingTaskGroup(of: Void.self) { group in
     group.cancelAll()
 }
 ```
+
+The package uses `Logger.current` from [swift-log](https://github.com/apple/swift-log) for database logging.
 
 ## Other database drivers
 

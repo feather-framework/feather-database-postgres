@@ -6,6 +6,7 @@
 //
 
 import FeatherDatabase
+import Logging
 import PostgresNIO
 
 extension DatabaseQuery {
@@ -45,7 +46,6 @@ public struct DatabaseConnectionPostgres: DatabaseConnection {
     public typealias RowSequence = DatabaseRowSequencePostgres
 
     var connection: PostgresConnection
-    public var logger: Logger
 
     /// Execute a Postgres query on this connection.
     ///
@@ -63,7 +63,7 @@ public struct DatabaseConnectionPostgres: DatabaseConnection {
         do {
             let sequence = try await connection.query(
                 query.toPostgresQuery(),
-                logger: logger
+                logger: Logger.current
             )
 
             return try await handler(
