@@ -57,57 +57,59 @@ import PostgresNIO
 import FeatherDatabase
 import FeatherDatabasePostgres
 
-let finalCertPath = URL(fileURLWithPath: "/path/to/ca.pem")
-var tlsConfig = TLSConfiguration.makeClientConfiguration()
-let rootCert = try NIOSSLCertificate.fromPEMFile(finalCertPath)
-tlsConfig.trustRoots = .certificates(rootCert)
-tlsConfig.certificateVerification = .fullVerification
+try await withLogger(Logger(label: "example")) { _ in
+    let finalCertPath = URL(fileURLWithPath: "/path/to/ca.pem")
+    var tlsConfig = TLSConfiguration.makeClientConfiguration()
+    let rootCert = try NIOSSLCertificate.fromPEMFile(finalCertPath)
+    tlsConfig.trustRoots = .certificates(rootCert)
+    tlsConfig.certificateVerification = .fullVerification
 
-let client = PostgresClient(
-    configuration: .init(
-        host: "127.0.0.1",
-        port: 5432,
-        username: "postgres",
-        password: "postgres",
-        database: "postgres",
-        tls: .require(tlsConfig)
-    ),
-    backgroundLogger: Logger.current
-)
+    let client = PostgresClient(
+        configuration: .init(
+            host: "127.0.0.1",
+            port: 5432,
+            username: "postgres",
+            password: "postgres",
+            database: "postgres",
+            tls: .require(tlsConfig)
+        ),
+        backgroundLogger: Logger.current
+    )
 
-let database = DatabaseClientPostgres(
-    client: client
-)
+    let database = DatabaseClientPostgres(
+        client: client
+    )
 
-try await withThrowingTaskGroup(of: Void.self) { group in
-    // run the client as a service
-    group.addTask {
-        await client.run()
-    }
-    // execute some query
-    group.addTask {
-        let result = try await database.withConnection { connection in
-            try await connection.run(
-                query: #"""
-                    SELECT
-                        version() AS "version"
-                    WHERE
-                        1=\#(1);
-                    """#
-            )
+    try await withThrowingTaskGroup(of: Void.self) { group in
+        // run the client as a service
+        group.addTask {
+            await client.run()
         }
+        // execute some query
+        group.addTask {
+            let result = try await database.withConnection { connection in
+                try await connection.run(
+                    query: #"""
+                        SELECT
+                            version() AS "version"
+                        WHERE
+                            1=\#(1);
+                        """#
+                )
+            }
 
-        for try await item in result {
-            let version = try item.decode(column: "version", as: String.self)
-            print(version)
+            for try await item in result {
+                let version = try item.decode(column: "version", as: String.self)
+                print(version)
+            }
         }
+        try await group.next()
+        group.cancelAll()
     }
-    try await group.next()
-    group.cancelAll()
 }
 ```
 
-The package uses `Logger.current` from [swift-log](https://github.com/apple/swift-log) for database logging.
+The package uses `Logger.current` from [swift-log](https://github.com/apple/swift-log) for database logging. Use `withLogger` to scope the logger for an operation; calls to `Logger.current` within that scope use the scoped logger.
 
 ## Other database drivers
 
