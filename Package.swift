@@ -35,9 +35,9 @@ let package = Package(
         .library(name: "FeatherDatabasePostgres", targets: ["FeatherDatabasePostgres"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-log", from: "1.6.0"),
+        .package(url: "https://github.com/apple/swift-log", from: "1.14.0"),
         .package(url: "https://github.com/vapor/postgres-nio", from: "1.27.0"),
-        .package(url: "https://github.com/feather-framework/feather-database", exact: "1.0.0-rc.1"),
+        .package(url: "https://github.com/feather-framework/feather-database", exact: "1.0.0-rc.2"),
         // [docc-plugin-placeholder]
     ],
     targets: [

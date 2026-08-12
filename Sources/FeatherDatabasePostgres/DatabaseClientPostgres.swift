@@ -16,20 +16,16 @@ public struct DatabaseClientPostgres: DatabaseClient {
     public typealias Connection = DatabaseConnectionPostgres
 
     var client: PostgresNIO.PostgresClient
-    let logger: Logger
 
     /// Create a Postgres database client.
     ///
     /// Use this initializer to provide an existing Postgres client.
-    /// - Parameters:
+    /// - Parameter:
     ///   - client: The underlying Postgres client.
-    ///   - logger: The logger for database operations.
     public init(
-        client: PostgresNIO.PostgresClient,
-        logger: Logger
+        client: PostgresNIO.PostgresClient
     ) {
         self.client = client
-        self.logger = logger
     }
 
     // MARK: - database api
@@ -44,12 +40,10 @@ public struct DatabaseClientPostgres: DatabaseClient {
     public func withConnection<T>(
         _ closure: (Connection) async throws -> T,
     ) async throws(DatabaseError) -> T {
-        let logger = self.logger
         let body: (PostgresConnection) async throws -> T = { connection in
             try await closure(
                 DatabaseConnectionPostgres(
-                    connection: connection,
-                    logger: logger
+                    connection: connection
                 )
             )
         }
@@ -75,7 +69,6 @@ public struct DatabaseClientPostgres: DatabaseClient {
     public func withTransaction<T>(
         _ closure: (Connection) async throws -> T,
     ) async throws(DatabaseError) -> T {
-        let logger = self.logger
         let beginQuery = PostgresQuery(unsafeSQL: "BEGIN", binds: .init())
         let commitQuery = PostgresQuery(unsafeSQL: "COMMIT", binds: .init())
         let rollbackQuery = PostgresQuery(unsafeSQL: "ROLLBACK", binds: .init())
@@ -83,12 +76,14 @@ public struct DatabaseClientPostgres: DatabaseClient {
         do {
             return try await client.withConnection { connection in
                 let databaseConnection = DatabaseConnectionPostgres(
-                    connection: connection,
-                    logger: logger
+                    connection: connection
                 )
 
                 do {
-                    _ = try await connection.query(beginQuery, logger: logger)
+                    _ = try await connection.query(
+                        beginQuery,
+                        logger: Logger.current
+                    )
                 }
                 catch {
                     throw DatabaseError.transaction(
@@ -103,7 +98,7 @@ public struct DatabaseClientPostgres: DatabaseClient {
                     do {
                         _ = try await connection.query(
                             commitQuery,
-                            logger: logger
+                            logger: Logger.current
                         )
                         return result
                     }
@@ -113,7 +108,7 @@ public struct DatabaseClientPostgres: DatabaseClient {
                         do {
                             _ = try await connection.query(
                                 rollbackQuery,
-                                logger: logger
+                                logger: Logger.current
                             )
                         }
                         catch {
@@ -133,7 +128,7 @@ public struct DatabaseClientPostgres: DatabaseClient {
                     do {
                         _ = try await connection.query(
                             rollbackQuery,
-                            logger: logger
+                            logger: Logger.current
                         )
                     }
                     catch {

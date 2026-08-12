@@ -1,12 +1,8 @@
-# Feather Database Postgres 
+# Feather Database Postgres
 
 Postgres driver implementation for the abstract [Feather Database](https://github.com/feather-framework/feather-database) Swift API package.
 
-[
-    ![Release: 1.0.0-rc.1](https://img.shields.io/badge/Release-1%2E0%2E0--rc%2E1-F05138)
-](
-    https://github.com/feather-framework/feather-database-postgres/releases/tag/1.0.0-rc.1
-)
+[![Release: 1.0.0-rc.2](https://img.shields.io/badge/Release-1%2E0%2E0--rc%2E2-F05138)](https://github.com/feather-framework/feather-database-postgres/releases/tag/1.0.0-rc.2)
 
 ## Features
 
@@ -37,7 +33,7 @@ Postgres driver implementation for the abstract [Feather Database](https://githu
 Add the dependency to your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/feather-framework/feather-database-postgres", exact: "1.0.0-rc.1"),
+.package(url: "https://github.com/feather-framework/feather-database-postgres", exact: "1.0.0-rc.2"),
 ```
 
 Then add `FeatherDatabasePostgres` to your target dependencies:
@@ -50,11 +46,7 @@ Then add `FeatherDatabasePostgres` to your target dependencies:
 
 API documentation is available at the link below:
 
-[
-    ![DocC API documentation](https://img.shields.io/badge/DocC-API_documentation-F05138)
-](
-    https://feather-framework.github.io/feather-database-postgres/
-)
+[![DocC API documentation](https://img.shields.io/badge/DocC-API_documentation-F05138)](https://feather-framework.github.io/feather-database-postgres/)
 
 Here is a brief example:
 
@@ -65,59 +57,59 @@ import PostgresNIO
 import FeatherDatabase
 import FeatherDatabasePostgres
 
-var logger = Logger(label: "example")
-logger.logLevel = .info
+try await withLogger(Logger(label: "example")) { _ in
+    let finalCertPath = URL(fileURLWithPath: "/path/to/ca.pem")
+    var tlsConfig = TLSConfiguration.makeClientConfiguration()
+    let rootCert = try NIOSSLCertificate.fromPEMFile(finalCertPath)
+    tlsConfig.trustRoots = .certificates(rootCert)
+    tlsConfig.certificateVerification = .fullVerification
 
-let finalCertPath = URL(fileURLWithPath: "/path/to/ca.pem")
-var tlsConfig = TLSConfiguration.makeClientConfiguration()
-let rootCert = try NIOSSLCertificate.fromPEMFile(finalCertPath)
-tlsConfig.trustRoots = .certificates(rootCert)
-tlsConfig.certificateVerification = .fullVerification
+    let client = PostgresClient(
+        configuration: .init(
+            host: "127.0.0.1",
+            port: 5432,
+            username: "postgres",
+            password: "postgres",
+            database: "postgres",
+            tls: .require(tlsConfig)
+        ),
+        backgroundLogger: Logger.current
+    )
 
-let client = PostgresClient(
-    configuration: .init(
-        host: "127.0.0.1",
-        port: 5432,
-        username: "postgres",
-        password: "postgres",
-        database: "postgres",
-        tls: .require(tlsConfig)
-    ),
-    backgroundLogger: logger
-)
+    let database = DatabaseClientPostgres(
+        client: client
+    )
 
-let database = DatabaseClientPostgres(
-    client: client,
-    logger: logger
-)
-
-try await withThrowingTaskGroup(of: Void.self) { group in
-    // run the client as a service
-    group.addTask {
-        await client.run()
-    }
-    // execute some query
-    group.addTask {
-        let result = try await database.withConnection { connection in
-            try await connection.run(
-                query: #"""
-                    SELECT
-                        version() AS "version"
-                    WHERE
-                        1=\#(1);
-                    """#
-            )
+    try await withThrowingTaskGroup(of: Void.self) { group in
+        // run the client as a service
+        group.addTask {
+            await client.run()
         }
+        // execute some query
+        group.addTask {
+            let result = try await database.withConnection { connection in
+                try await connection.run(
+                    query: #"""
+                        SELECT
+                            version() AS "version"
+                        WHERE
+                            1=\#(1);
+                        """#
+                )
+            }
 
-        for try await item in result {
-            let version = try item.decode(column: "version", as: String.self)
-            print(version)
+            for try await item in result {
+                let version = try item.decode(column: "version", as: String.self)
+                print(version)
+            }
         }
+        try await group.next()
+        group.cancelAll()
     }
-    try await group.next()
-    group.cancelAll()
 }
 ```
+
+The package uses `Logger.current` from [swift-log](https://github.com/apple/swift-log) for database logging. Use `withLogger` to scope the logger for an operation; calls to `Logger.current` within that scope use the scoped logger.
 
 ## Other database drivers
 
