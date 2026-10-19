@@ -313,7 +313,7 @@ struct FeatherDatabasePostgresTestSuite {
                     let id: Int
                     let name: String
 
-                    init(_ row: DatabaseRow) throws {
+                    init(_ row: any DatabaseRow) throws {
                         self.id = try row.decode(column: "id", as: Int.self)
                         self.name = try row.decode(
                             column: "name",
@@ -386,7 +386,7 @@ struct FeatherDatabasePostgresTestSuite {
                     let id: Int
                     let value: String
 
-                    init(_ row: DatabaseRow) throws {
+                    init(_ row: any DatabaseRow) throws {
                         self.id = try row.decode(column: "id", as: Int.self)
                         self.value = try row.decode(
                             column: "value",
@@ -678,7 +678,7 @@ struct FeatherDatabasePostgresTestSuite {
                     let boundBool: Bool?
                     let missingBool: Bool?
 
-                    init(_ row: DatabaseRow) throws {
+                    init(_ row: any DatabaseRow) throws {
                         self.boundString = try row.decode(
                             column: "bound_string",
                             as: String?.self
@@ -780,7 +780,7 @@ struct FeatherDatabasePostgresTestSuite {
                     let rawBool: Bool?
                     let missingBool: Bool?
 
-                    init(_ row: DatabaseRow) throws {
+                    init(_ row: any DatabaseRow) throws {
                         self.rawString = try row.decode(
                             column: "raw_string",
                             as: String?.self
@@ -1373,7 +1373,7 @@ struct FeatherDatabasePostgresTestSuite {
                 let accessToken: String
                 let isValid: Bool
 
-                init(_ row: DatabaseRow) throws {
+                init(_ row: any DatabaseRow) throws {
                     self.refreshCount = try row.decode(
                         column: "refresh_count",
                         as: Int.self
@@ -1720,13 +1720,16 @@ struct FeatherDatabasePostgresTestSuite {
             let table = "metatype_mismatch_\(suffix)"
 
             func decodeWithMismatchedMetatype<T: Decodable, U: Decodable>(
-                row: DatabaseRow,
+                row: any DatabaseRow,
                 column: String,
                 as _: T.Type,
                 using _: U.Type
             ) throws -> T {
                 // Force a mismatched metatype to exercise the guard cast failure.
-                let mismatchedType = unsafeBitCast(U.self, to: T.Type.self)
+                let mismatchedType = unsafe unsafeBitCast(
+                    U.self,
+                    to: T.Type.self
+                )
                 return try row.decode(column: column, as: mismatchedType)
             }
 

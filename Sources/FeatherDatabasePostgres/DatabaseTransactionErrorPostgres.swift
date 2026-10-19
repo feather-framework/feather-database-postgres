@@ -5,7 +5,7 @@
 //  Created by Tibor Bödecs on 2026. 02. 02..
 //
 
-import FeatherDatabase
+public import FeatherDatabase
 import PostgresNIO
 
 public struct DatabaseTransactionErrorPostgres: DatabaseTransactionError {

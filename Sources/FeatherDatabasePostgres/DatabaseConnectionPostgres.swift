@@ -5,7 +5,7 @@
 //  Created by Tibor Bödecs on 2026. 01. 10.
 //
 
-import FeatherDatabase
+public import FeatherDatabase
 import Logging
 import PostgresNIO
 
@@ -27,10 +27,22 @@ extension DatabaseQuery {
                 postgresBindings.append(value)
             case .int(let value):
                 postgresBindings.append(value)
+            case .int32(let value):
+                postgresBindings.append(value)
             case .double(let value):
+                postgresBindings.append(value)
+            case .float(let value):
                 postgresBindings.append(value)
             case .string(let value):
                 postgresBindings.append(value)
+            case .uuid(let value):
+                postgresBindings.append(value)
+            case .date(let value):
+                postgresBindings.append(value)
+            case .data(let value):
+                postgresBindings.append(PostgresData(bytes: value))
+            case .json(let value):
+                postgresBindings.append(PostgresData(jsonb: value))
             }
         }
 

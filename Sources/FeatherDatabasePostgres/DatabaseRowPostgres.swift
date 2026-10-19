@@ -5,12 +5,39 @@
 //  Created by Tibor Bödecs on 2026. 01. 10.
 //
 
-import FeatherDatabase
+public import FeatherDatabase
 import PostgresNIO
 
 public struct DatabaseRowPostgres: DatabaseRow {
 
     var row: PostgresRow
+    private let randomAccessRow: PostgresRandomAccessRow
+
+    init(row: PostgresRow) {
+        self.row = row
+        self.randomAccessRow = row.makeRandomAccess()
+    }
+
+    public var columns: [String] {
+        randomAccessRow.map(\.columnName)
+    }
+
+    public func contains(column: String) -> Bool {
+        randomAccessRow.contains(column)
+    }
+
+    public func decodeNil(column: String) throws(DecodingError) -> Bool {
+        guard randomAccessRow.contains(column) else {
+            throw .keyNotFound(
+                PostgresColumnKey(stringValue: column),
+                .init(
+                    codingPath: [],
+                    debugDescription: "Missing data for column \(column)."
+                )
+            )
+        }
+        return randomAccessRow[column].bytes == nil
+    }
 
     /// Decode a column value as the given type.
     ///
@@ -24,7 +51,7 @@ public struct DatabaseRowPostgres: DatabaseRow {
         column: String,
         as type: T.Type
     ) throws(DecodingError) -> T {
-        let row = row.makeRandomAccess()
+        let row = randomAccessRow
         guard row.contains(column) else {
             throw .dataCorrupted(
                 .init(
@@ -68,4 +95,11 @@ public struct DatabaseRowPostgres: DatabaseRow {
             )
         )
     }
+}
+
+private struct PostgresColumnKey: CodingKey {
+    let stringValue: String
+    let intValue: Int? = nil
+    init(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue: Int) { return nil }
 }
