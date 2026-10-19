@@ -5,9 +5,9 @@
 //  Created by Tibor Bödecs on 2026. 01. 10..
 //
 
-import FeatherDatabase
+public import FeatherDatabase
 import Logging
-import PostgresNIO
+public import PostgresNIO
 
 /// A Postgres-backed database client.
 ///
